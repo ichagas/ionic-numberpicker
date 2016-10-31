@@ -7,8 +7,8 @@
   angular.module('ionic-numberpicker')
     .directive('ionicNumberpicker', ionicNumberpicker);
 
-  ionicNumberpicker.$inject = ['$ionicPopup'];
-  function ionicNumberpicker($ionicPopup) {
+  ionicNumberpicker.$inject = ['$ionicPopup', '$parse'];
+  function ionicNumberpicker($ionicPopup, $parse) {
     return {
       restrict: 'AE',
       replace: true,
@@ -31,11 +31,23 @@
         scope.decimalCharacter = scope.inputObj.decimalCharacter ? scope.inputObj.decimalCharacter : '.';
         scope.setButtonType = scope.inputObj.setButtonType ? scope.inputObj.setButtonType : 'button-positive';
         scope.closeButtonType = scope.inputObj.closeButtonType ? scope.inputObj.closeButtonType : 'button-stable';
+        scope.numDigits = scope.inputObj.numDigits ? scope.inputObj.numDigits : 6;
 
         scope.wholeNumber = 0;
         scope.decimalNumber = 0;
         scope.isNegative = false;
         scope.numericValue = Number(scope.wholeNumber + '.' + scope.decimalNumber);
+
+        function pad(n, width, z) {
+          z = z || '0';
+          n = n + '';
+          return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
+        }
+
+        if (scope.format === 'NUMBER_ARRAY') {
+          var number = pad(parseInt(scope.inputValue), scope.numDigits);
+          scope.numberArray = ('' + number).split('');
+        }
 
         //Changing the style
         scope.changeFormat = function () {
@@ -84,6 +96,30 @@
           scope.checkMin();
         };
 
+        //Increasing the decimal number
+        scope.increaseNumber = function (item) {
+          var number = scope.numberArray[item];
+          if (number < 9) { number++; } else { number = 0; }
+          scope.numberArray[item] = number;
+        };
+
+        //Decreasing the decimal number
+        scope.decreaseNumber = function (item) {
+          var number = scope.numberArray[item];
+          if (number > 0) { number--; } else { number = 9; }
+          scope.numberArray[item] = number;
+        };
+
+        function buildFinalNumber() {
+          var finalNumber = '';
+          var len = scope.numberArray.length
+
+          for(var i = 0 ; i < scope.numberArray.length ; i++) {
+            finalNumber += '' + scope.numberArray[i];
+          }
+          return (finalNumber)
+        }
+
         function strip(number, precision) {
           var returnVal = (parseFloat(number).toFixed(scope.precision));
           return returnVal;
@@ -121,8 +157,17 @@
           }
         }
 
+        scope.inputObj.setNumber = function (num) {
+          scope.inputValue = num;
+          if (scope.format === 'NUMBER_ARRAY') {
+            var number = pad(parseInt(scope.inputValue), scope.numDigits);
+            scope.numberArray = ('' + number).split('');
+          }
+        }
+
         //onclick of the button
-        element.on("click", function () {
+        scope.inputObj.showPicker = function () {
+        // element.on("click", function () {
           if (scope.format == 'DECIMAL') {
 
             //Get Values from Initial Number
@@ -157,7 +202,7 @@
               ]
             });
 
-          } else {
+          } else if (scope.format == 'WHOLE') {
             //Get Values from Initial Number
             scope.wholeNumber = findWholeNumber(scope.inputValue);
             scope.decimalNumber = 0;
@@ -187,8 +232,35 @@
                 }
               ]
             });
+          } else {
+
+            $ionicPopup.show({
+              templateUrl: 'ionic-numberpicker-array.html',
+              title: scope.titleLabel,
+              subTitle: '',
+              scope: scope,
+              buttons: [
+                {
+                  text: scope.closeLabel,
+                  type: scope.closeButtonType,
+                  onTap: function (e) {
+                    scope.inputObj.callback(undefined);
+                  }
+                },
+                {
+                  text: scope.setLabel,
+                  type: scope.setButtonType,
+                  onTap: function (e) {
+                    scope.loadingContent = true;
+
+                    scope.inputObj.callback(buildFinalNumber());
+                  }
+                }
+              ]
+            });
           }
-        });
+        //});
+        }
       }
     };
   }
